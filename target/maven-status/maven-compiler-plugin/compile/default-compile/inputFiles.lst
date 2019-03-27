@@ -1,4 +1,8 @@
 /home/hodalpert/IdeaProjects/Localapplication/src/main/java/com/Local_aplication/managers/BaseManager.java
+/home/hodalpert/IdeaProjects/Localapplication/src/main/java/com/Local_aplication/Run.java
+/home/hodalpert/IdeaProjects/Localapplication/src/main/java/com/Local_aplication/common/common.java
 /home/hodalpert/IdeaProjects/Localapplication/src/main/java/com/Local_aplication/managers/S3Manager.java
+/home/hodalpert/IdeaProjects/Localapplication/src/main/java/com/Local_aplication/common/init.java
+/home/hodalpert/IdeaProjects/Localapplication/src/main/java/com/Local_aplication/managers/SQSManager.java
 /home/hodalpert/IdeaProjects/Localapplication/src/main/java/com/Local_aplication/managers/EC2Manager.java
 /home/hodalpert/IdeaProjects/Localapplication/src/main/java/com/Local_aplication/Main.java

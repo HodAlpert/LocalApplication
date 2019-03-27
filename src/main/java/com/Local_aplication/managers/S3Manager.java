@@ -18,9 +18,9 @@ import java.util.Iterator;
 import java.util.List;
 
 
+import com.Local_aplication.common.init;
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
-import com.amazonaws.SdkClientException;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.*;
@@ -44,31 +44,10 @@ public class S3Manager extends BaseManager {
             .build();
     private String bucket_name;
 
-    public S3Manager() {
-        super();
-    }
-
-//    public static void main(String[] args) throws IOException {
-//        /*
-//         * Important: Be sure to fill in your AWS access credentials in the
-//         *            AwsCredentials.properties file before you try to run this
-//         *            sample.
-//         * http://aws.amazon.com/security-credentials
-//         */
-//
-
-    public void create_bucket(String directoryName) {
-        bucket_name =
-                credentials.getAWSAccessKeyId() + "-" + directoryName.
-                        replace('\\', '_').
-                        replace('/', '_').
-                        replace(':', '_');
-        bucket_name = bucket_name.toLowerCase();
+    public void create_bucket() {
+        logger.config("entry");
+        bucket_name = init.bucket_name;
         String key = null;
-
-        System.out.println("===========================================");
-        System.out.println("Creating S3 Bucket");
-        System.out.println("===========================================\n");
 
         try {
             /*
@@ -79,37 +58,38 @@ public class S3Manager extends BaseManager {
              * You can optionally specify a location for your bucket if you want to
              * keep your data closer to your applications or users.
              */
-            System.out.println("Creating bucket " + bucket_name + "\n");
-            s3.createBucket(bucket_name);
-
+            logger.info("Creating bucket " + bucket_name);
+            Bucket answer = s3.createBucket(bucket_name);
+            logger.config("returned " + answer);
             /*
              * List the buckets in your account
              */
-            System.out.println("Listing buckets");
-            for (Bucket bucket : s3.listBuckets()) {
-                System.out.println(" - " + bucket.getName());
-            }
-            System.out.println();
-
-        } catch (AmazonServiceException ase) {
-            if (ase.getStatusCode() == 409 && ase.getErrorCode().equals("BucketAlreadyOwnedByYou")){
+        }
+        catch (AmazonServiceException ase) {
+            if (ase.getStatusCode() == 409 && ase.getErrorCode().equals("BucketAlreadyOwnedByYou")) {
                 System.out.println("bucket " + bucket_name + "already exist");
                 return;
             }
-            System.out.println("Caught an AmazonServiceException, which means your request made it "
-                    + "to Amazon S3, but was rejected with an error response for some reason.");
-            System.out.println("Error Message:    " + ase.getMessage());
-            System.out.println("HTTP Status Code: " + ase.getStatusCode());
-            System.out.println("AWS Error Code:   " + ase.getErrorCode());
-            System.out.println("Error Type:       " + ase.getErrorType());
-            System.out.println("Request ID:       " + ase.getRequestId());
-        } catch (AmazonClientException ace) {
-            System.out.println("Caught an AmazonClientException, which means the client encountered "
-                    + "a serious internal problem while trying to communicate with S3, "
-                    + "such as not being able to access the network.");
-            System.out.println("Error Message: " + ace.getMessage());
+            handle_amazon_service_exception(ase);
         }
+            catch (AmazonClientException ace){
+                handle_client_exception(ace);
+            }
     }
+    public List<Bucket> list_buckets(){
+        try {
+            List<Bucket> answer = s3.listBuckets();
+            logger.config("returned " + answer);
+            return answer;
+        }
+        catch (Exception exc) {
+            handle_exception(exc);
+            return null;
+        }
+
+    }
+
+
 
     public List<PutObjectResult> upload_object(String directoryName) throws AmazonClientException {
         /*
@@ -120,29 +100,45 @@ public class S3Manager extends BaseManager {
          * like content-type and content-encoding, plus additional metadata
          * specific to your applications.
          */
-        List<PutObjectResult> list = new ArrayList<PutObjectResult>();
-        System.out.println("Uploading a new object to S3 from a file\n");
-        File dir = new File(directoryName);
-        if (dir.listFiles() == null){
-            list.add(put_file(dir));
-        }
-        else {
-            for (File file : dir.listFiles()) {
-                list.add(put_file(file));
+        try {
+            logger.config("entry");
+            List<PutObjectResult> answer = new ArrayList<PutObjectResult>();
+            logger.info("Uploading a new object to S3 from directory " + directoryName);
+            File dir = new File(directoryName);
+            if (dir.listFiles() == null) {
+                answer.add(put_file(dir));
+            } else {
+                for (File file : dir.listFiles()) {
+                    answer.add(put_file(file));
+                }
             }
+            logger.config("returned " + answer);
+            return answer;
         }
-        return list;
+        catch (Exception exc) {
+            handle_exception(exc);
+            return null;
+        }
     }
 
     private PutObjectResult put_file(File file) {
-        String key = file.getName().replace('\\', '_').replace('/', '_').replace(':', '_');
-        PutObjectRequest req = new PutObjectRequest(bucket_name, key, file);
-        return s3.putObject(req);
+        try {
+            logger.config("entry");
+            logger.info("putting file "+ file.toString() + "in bucket");
+            String key = file.getName().replace('\\', '_').replace('/', '_').replace(':', '_');
+            PutObjectRequest req = new PutObjectRequest(bucket_name, key, file);
+            PutObjectResult answer = s3.putObject(req);
+            logger.config("returned " + answer);
+            return answer;
+        }
+        catch (Exception exc) {
+            handle_exception(exc);
+            return null;
+        }
+
     }
 
     public void download_file_as_text(String key, String path) {
-
-
         /*
          * Download an object - When you download an object, you get all of
          * the object's metadata and a stream from which to read the contents.
@@ -155,17 +151,24 @@ public class S3Manager extends BaseManager {
          * conditional downloading of objects based on modification times,
          * ETags, and selectively downloading a range of an object.
          */
-        System.out.println("Downloading an object");
-        S3Object object = s3.getObject(new GetObjectRequest(bucket_name, key));
-        System.out.println("Content-Type: " + object.getObjectMetadata().getContentType());
         try {
-            displayTextInputStream(object.getObjectContent(), path);
-        } catch (IOException e) {
-            e.printStackTrace();
+            logger.config("entry");
+            logger.info("downloading file " + key + "to " + path);
+            S3Object object = s3.getObject(new GetObjectRequest(bucket_name, key));
+            logger.config("Content-Type: " + object.getObjectMetadata().getContentType());
+            try {
+                displayTextInputStream(object.getObjectContent(), path);
+                logger.config("downloaded");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        catch (Exception exc) {
+            handle_exception(exc);
         }
     }
 
-    public List<S3ObjectSummary> list() {
+    public List<S3ObjectSummary> list_objects(String prefix) {
         /*
          * List objects in your bucket by prefix - There are many options for
          * listing the objects in your bucket.  Keep in mind that buckets with
@@ -174,17 +177,19 @@ public class S3Manager extends BaseManager {
          * use the AmazonS3.listNextBatchOfObjects(...) operation to retrieve
          * additional results.
          */
-        System.out.println("Listing objects");
-        List<S3ObjectSummary> list = new ArrayList<S3ObjectSummary>();
-        ObjectListing objectListing = s3.listObjects(new ListObjectsRequest()
-                .withBucketName(bucket_name)
-                .withPrefix("My"));
-        for (S3ObjectSummary objectSummary : objectListing.getObjectSummaries()) {
-            System.out.println(" - " + objectSummary.getKey() + "  " +
-                    "(size = " + objectSummary.getSize() + ")");
-            list.add(objectSummary);
+        try {
+            logger.config("entry");
+            ObjectListing objectListing = s3.listObjects(new ListObjectsRequest()
+                    .withBucketName(bucket_name)
+                    .withPrefix(prefix));
+            List<S3ObjectSummary> answer = new ArrayList<S3ObjectSummary>(objectListing.getObjectSummaries());
+            logger.config("returned; " + answer);
+            return answer;
         }
-        return list;
+        catch (Exception exc) {
+            handle_exception(exc);
+            return null;
+        }
     }
 
     public void delete_object(String key) {
@@ -192,8 +197,15 @@ public class S3Manager extends BaseManager {
          * Delete an object - Unless versioning has been turned on for your bucket,
          * there is no way to undelete an object, so use caution when deleting objects.
          */
-        System.out.println("Deleting an object\n");
-        s3.deleteObject(bucket_name, key);
+        try {
+            logger.config("entry");
+            logger.info("deleting file" + key + "from bucket");
+            s3.deleteObject(bucket_name, key);
+            logger.config("deleted successfully");
+        }
+        catch (Exception exc) {
+            handle_exception(exc);
+        }
     }
 
     public void delete_bucket() {
@@ -202,55 +214,49 @@ public class S3Manager extends BaseManager {
         // delete markers for all objects, but doesn't delete the object versions.
         // To delete objects from versioned buckets, delete all of the object versions before deleting
         // the bucket (see below for an example).
-        try{
+        try {
+            logger.config("entry");
+            logger.config("deleting bucket");
+            ObjectListing objectListing = s3.listObjects(bucket_name);
+            while (true) {
+                Iterator<S3ObjectSummary> objIter = objectListing.getObjectSummaries().iterator();
+                while (objIter.hasNext()) {
+                    s3.deleteObject(bucket_name, objIter.next().getKey());
+                }
 
-        ObjectListing objectListing = s3.listObjects(bucket_name);
-        while (true) {
-            Iterator<S3ObjectSummary> objIter = objectListing.getObjectSummaries().iterator();
-            while (objIter.hasNext()) {
-                s3.deleteObject(bucket_name, objIter.next().getKey());
+                // If the bucket contains many objects, the listObjects() call
+                // might not return all of the objects in the first listing. Check to
+                // see whether the listing was truncated. If so, retrieve the next page of objects
+                // and delete them.
+                if (objectListing.isTruncated()) {
+                    objectListing = s3.listNextBatchOfObjects(objectListing);
+                } else {
+                    break;
+                }
             }
 
-            // If the bucket contains many objects, the listObjects() call
-            // might not return all of the objects in the first listing. Check to
-            // see whether the listing was truncated. If so, retrieve the next page of objects 
-            // and delete them.
-            if (objectListing.isTruncated()) {
-                objectListing = s3.listNextBatchOfObjects(objectListing);
-            } else {
-                break;
+            // Delete all object versions (required for versioned buckets).
+            VersionListing versionList = s3.listVersions(new ListVersionsRequest().withBucketName(bucket_name));
+            while (true) {
+                Iterator<S3VersionSummary> versionIter = versionList.getVersionSummaries().iterator();
+                while (versionIter.hasNext()) {
+                    S3VersionSummary vs = versionIter.next();
+                    s3.deleteVersion(bucket_name, vs.getKey(), vs.getVersionId());
+                }
+
+                if (versionList.isTruncated()) {
+                    versionList = s3.listNextBatchOfVersions(versionList);
+                } else {
+                    break;
+                }
             }
+
+            // After all objects and object versions are deleted, delete the bucket.
+            s3.deleteBucket(bucket_name);
         }
-
-        // Delete all object versions (required for versioned buckets).
-        VersionListing versionList = s3.listVersions(new ListVersionsRequest().withBucketName(bucket_name));
-        while (true) {
-            Iterator<S3VersionSummary> versionIter = versionList.getVersionSummaries().iterator();
-            while (versionIter.hasNext()) {
-                S3VersionSummary vs = versionIter.next();
-                s3.deleteVersion(bucket_name, vs.getKey(), vs.getVersionId());
-            }
-
-            if (versionList.isTruncated()) {
-                versionList = s3.listNextBatchOfVersions(versionList);
-            } else {
-                break;
-            }
+        catch (Exception exc) {
+            handle_exception(exc);
         }
-
-        // After all objects and object versions are deleted, delete the bucket.
-        s3.deleteBucket(bucket_name);
-    }
-        catch(AmazonServiceException e) {
-        // The call was transmitted successfully, but Amazon S3 couldn't process 
-        // it, so it returned an error response.
-        e.printStackTrace();
-    }
-        catch( SdkClientException e) {
-        // Amazon S3 couldn't be contacted for a response, or the client couldn't
-        // parse the response from Amazon S3.
-        e.printStackTrace();
-    }
 }
 
     

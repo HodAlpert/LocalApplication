@@ -1,4 +1,8 @@
 com/Local_aplication/managers/BaseManager.class
+com/Local_aplication/common/common.class
+com/Local_aplication/Run.class
+com/Local_aplication/common/init.class
 com/Local_aplication/Main.class
+com/Local_aplication/managers/SQSManager.class
 com/Local_aplication/managers/EC2Manager.class
 com/Local_aplication/managers/S3Manager.class
