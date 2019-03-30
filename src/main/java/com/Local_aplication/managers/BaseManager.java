@@ -4,6 +4,8 @@ import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
+
+import java.util.Arrays;
 import java.util.logging.*;
 
 public class BaseManager {
@@ -24,7 +26,7 @@ public class BaseManager {
         ace.printStackTrace();
     }
     protected void handle_exception(Exception exc){
-
+        logger.log(Level.SEVERE, "an exception was thrown" + exc.getMessage() + exc.getCause() + Arrays.toString(exc.getStackTrace()), exc);
         if (exc instanceof AmazonServiceException){
             handle_amazon_service_exception((AmazonServiceException) exc);
         }

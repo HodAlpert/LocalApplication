@@ -1,5 +1,7 @@
 com/Local_aplication/managers/BaseManager.class
 com/Local_aplication/common/common.class
+com/Local_aplication/managers/HTMLManager.class
+com/Local_aplication/common/LogFormatter.class
 com/Local_aplication/Run.class
 com/Local_aplication/common/init.class
 com/Local_aplication/Main.class

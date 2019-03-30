@@ -16,6 +16,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 
 
 import com.Local_aplication.common.init;
@@ -42,10 +43,10 @@ public class S3Manager extends BaseManager {
     private AmazonS3 s3 = AmazonS3ClientBuilder.standard()
             .withRegion("us-east-2")
             .build();
-    private String bucket_name;
+    private String bucket_name = init.bucket_name;
 
     public void create_bucket() {
-        logger.config("entry");
+        logger.fine("entry");
         bucket_name = init.bucket_name;
         String key = null;
 
@@ -58,9 +59,9 @@ public class S3Manager extends BaseManager {
              * You can optionally specify a location for your bucket if you want to
              * keep your data closer to your applications or users.
              */
-            logger.info("Creating bucket " + bucket_name);
+            logger.fine("Creating bucket " + bucket_name);
             Bucket answer = s3.createBucket(bucket_name);
-            logger.config("returned " + answer);
+            logger.fine("returned " + answer);
             /*
              * List the buckets in your account
              */
@@ -79,7 +80,7 @@ public class S3Manager extends BaseManager {
     public List<Bucket> list_buckets(){
         try {
             List<Bucket> answer = s3.listBuckets();
-            logger.config("returned " + answer);
+            logger.fine("returned " + answer);
             return answer;
         }
         catch (Exception exc) {
@@ -91,7 +92,7 @@ public class S3Manager extends BaseManager {
 
 
 
-    public List<PutObjectResult> upload_object(String directoryName) throws AmazonClientException {
+    public String upload_object(String file_name) throws AmazonClientException {
         /*
          * Upload an object to your bucket - You can easily upload a file to
          * S3, or upload directly an InputStream if you know the length of
@@ -101,18 +102,10 @@ public class S3Manager extends BaseManager {
          * specific to your applications.
          */
         try {
-            logger.config("entry");
-            List<PutObjectResult> answer = new ArrayList<PutObjectResult>();
-            logger.info("Uploading a new object to S3 from directory " + directoryName);
-            File dir = new File(directoryName);
-            if (dir.listFiles() == null) {
-                answer.add(put_file(dir));
-            } else {
-                for (File file : dir.listFiles()) {
-                    answer.add(put_file(file));
-                }
-            }
-            logger.config("returned " + answer);
+            logger.fine(String.format("Uploading file %s to S3 from directory", file_name));
+            File file = new File(file_name);
+            String answer = put_file(file);
+            logger.fine("returned " + answer);
             return answer;
         }
         catch (Exception exc) {
@@ -121,21 +114,24 @@ public class S3Manager extends BaseManager {
         }
     }
 
-    private PutObjectResult put_file(File file) {
+    private String put_file(File file) {
         try {
-            logger.config("entry");
-            logger.info("putting file "+ file.toString() + "in bucket");
+            logger.fine("putting file "+ file.toString() + " in bucket");
             String key = file.getName().replace('\\', '_').replace('/', '_').replace(':', '_');
+            key = String.format("%s:%s",UUID.randomUUID(), key);
             PutObjectRequest req = new PutObjectRequest(bucket_name, key, file);
             PutObjectResult answer = s3.putObject(req);
-            logger.config("returned " + answer);
-            return answer;
+            logger.fine("returned " + answer);
+            return key;
         }
         catch (Exception exc) {
             handle_exception(exc);
             return null;
         }
 
+    }
+    public String get_object_url(String key){
+        return String.format("https://s3.us-east-2.amazonaws.com/%s/%s", bucket_name, key);
     }
 
     public void download_file_as_text(String key, String path) {
@@ -152,13 +148,12 @@ public class S3Manager extends BaseManager {
          * ETags, and selectively downloading a range of an object.
          */
         try {
-            logger.config("entry");
-            logger.info("downloading file " + key + "to " + path);
+            logger.fine("downloading file " + key + "to " + path);
             S3Object object = s3.getObject(new GetObjectRequest(bucket_name, key));
-            logger.config("Content-Type: " + object.getObjectMetadata().getContentType());
+            logger.fine("Content-Type: " + object.getObjectMetadata().getContentType());
             try {
                 displayTextInputStream(object.getObjectContent(), path);
-                logger.config("downloaded");
+                logger.fine("downloaded");
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -178,12 +173,12 @@ public class S3Manager extends BaseManager {
          * additional results.
          */
         try {
-            logger.config("entry");
+            logger.fine("entry");
             ObjectListing objectListing = s3.listObjects(new ListObjectsRequest()
                     .withBucketName(bucket_name)
                     .withPrefix(prefix));
             List<S3ObjectSummary> answer = new ArrayList<S3ObjectSummary>(objectListing.getObjectSummaries());
-            logger.config("returned; " + answer);
+            logger.fine("returned; " + answer);
             return answer;
         }
         catch (Exception exc) {
@@ -198,12 +193,55 @@ public class S3Manager extends BaseManager {
          * there is no way to undelete an object, so use caution when deleting objects.
          */
         try {
-            logger.config("entry");
-            logger.info("deleting file" + key + "from bucket");
+            logger.fine("entry");
+            logger.fine("deleting file" + key + "from bucket");
             s3.deleteObject(bucket_name, key);
-            logger.config("deleted successfully");
+            logger.fine("deleted successfully");
         }
         catch (Exception exc) {
+            handle_exception(exc);
+        }
+    }
+    public void empty_bucket() {
+        logger.fine("emptying bucket");
+        // Delete all objects from the bucket. This is sufficient
+        // for unversioned buckets. For versioned buckets, when you attempt to delete objects, Amazon S3 inserts
+        // delete markers for all objects, but doesn't delete the object versions.
+        // To delete objects from versioned buckets, delete all of the object versions before deleting
+        // the bucket (see below for an example).
+        try {
+            logger.fine("deleting bucket");
+            ObjectListing objectListing = s3.listObjects(bucket_name);
+            while (true) {
+                for (S3ObjectSummary s3ObjectSummary : objectListing.getObjectSummaries()) {
+                    s3.deleteObject(bucket_name, s3ObjectSummary.getKey());
+                }
+
+                // If the bucket contains many objects, the listObjects() call
+                // might not return all of the objects in the first listing. Check to
+                // see whether the listing was truncated. If so, retrieve the next page of objects
+                // and delete them.
+                if (objectListing.isTruncated()) {
+                    objectListing = s3.listNextBatchOfObjects(objectListing);
+                } else {
+                    break;
+                }
+            }
+
+            // Delete all object versions (required for versioned buckets).
+            VersionListing versionList = s3.listVersions(new ListVersionsRequest().withBucketName(bucket_name));
+            while (true) {
+                for (S3VersionSummary vs : versionList.getVersionSummaries()) {
+                    s3.deleteVersion(bucket_name, vs.getKey(), vs.getVersionId());
+                }
+
+                if (versionList.isTruncated()) {
+                    versionList = s3.listNextBatchOfVersions(versionList);
+                } else {
+                    break;
+                }
+            }
+        } catch (Exception exc) {
             handle_exception(exc);
         }
     }
@@ -215,8 +253,8 @@ public class S3Manager extends BaseManager {
         // To delete objects from versioned buckets, delete all of the object versions before deleting
         // the bucket (see below for an example).
         try {
-            logger.config("entry");
-            logger.config("deleting bucket");
+            logger.fine("entry");
+            logger.fine("deleting bucket");
             ObjectListing objectListing = s3.listObjects(bucket_name);
             while (true) {
                 Iterator<S3ObjectSummary> objIter = objectListing.getObjectSummaries().iterator();
