@@ -2,6 +2,8 @@
 *.class
 *.idea/
 target/
+
+*.lst
 # Log file
 *.log
 *.txt

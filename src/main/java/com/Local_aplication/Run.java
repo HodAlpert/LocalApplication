@@ -100,7 +100,7 @@ public class Run {
         power_up_manager_if_needed();
         input_file = args[0];
         output_file = args[1];
-        number_of_instances_per_lines = Integer.parseInt(args[1]);
+        number_of_instances_per_lines = Integer.parseInt(args[2]);
         if (args.length == 4 && args[3].equals("terminate"))
             should_terminate = true;
     }
