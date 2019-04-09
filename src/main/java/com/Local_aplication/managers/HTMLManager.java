@@ -10,9 +10,11 @@ import java.util.logging.Level;
 
 public class HTMLManager {
     private String path;
+    private String output_file_path;
 
-    public HTMLManager(String path) {
+    public HTMLManager(String path, String output_file_path) {
         this.path = path;
+        this.output_file_path = output_file_path;
     }
 
     public void build_html_file() {
@@ -96,7 +98,7 @@ public class HTMLManager {
     }
 
     private void write_text_to_file(String content) {
-        try (PrintWriter writer = new PrintWriter("summary_file.html", "UTF-8")) {
+        try (PrintWriter writer = new PrintWriter(String.format("%s.html", output_file_path), "UTF-8")) {
             writer.print(content);
         } catch (FileNotFoundException | UnsupportedEncodingException e) {
             e.printStackTrace();

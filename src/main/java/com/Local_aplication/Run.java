@@ -17,7 +17,8 @@ public class Run {
     private S3Manager s3 = new S3Manager();
     private SQSManager sqs = new SQSManager();
     private boolean should_terminate = false;
-    private String file_path_to_upload;
+    private String input_file;
+    private String output_file;
     private int number_of_instances_per_lines = 10;
     private String client_id = String.valueOf(UUID.randomUUID());
     private Logger logger = init.logger;
@@ -28,8 +29,8 @@ public class Run {
 
     public void main(String[] args) {
         initialize_arguments(args);
-        logger.info("uploading input.txt");
-        String key = s3.upload_object(file_path_to_upload);
+        logger.info(String.format("uploading file: %s", input_file));
+        String key = s3.upload_object(input_file);
         logger.info("sending message to manager");
         sqs.send_message(common.manager_queue_url, common.generate_new_task_message(client_id, key, number_of_instances_per_lines),
                 client_id,
@@ -64,7 +65,7 @@ public class Run {
         s3.download_file_as_text(S3_key, S3_key);
         logger.info("downloaded output.txt from manager");
         sqs.delete_message(common.clients_queue_url, message);
-        new HTMLManager(S3_key).build_html_file();
+        new HTMLManager(S3_key, output_file).build_html_file();
     }
 
     /**
@@ -91,15 +92,16 @@ public class Run {
     }
 
     /**
-     * parses and store file_path_to_upload, number_of_instances_per_lines and terminate
+     * parses and store input_file, number_of_instances_per_lines and terminate
      *
      * @param args list of command line arguments
      */
     private void initialize_arguments(String[] args) {
         power_up_manager_if_needed();
-        file_path_to_upload = args[0];
+        input_file = args[0];
+        output_file = args[1];
         number_of_instances_per_lines = Integer.parseInt(args[1]);
-        if (args.length == 3 && args[2].equals("terminate"))
+        if (args.length == 4 && args[3].equals("terminate"))
             should_terminate = true;
     }
 
